@@ -61,7 +61,7 @@ def _split_top_level(s, sep=","):
 
 
 def _parse_flow_map(s):
-    """{platform: confluence, url: "...", date: "2026-06-05"} → dict (YAML flow map)."""
+    """{platform: kakao, url: "...", date: "2021-03-14"} → dict (YAML flow map)."""
     s = s.strip()
     if s.startswith("{") and s.endswith("}"):
         s = s[1:-1]
@@ -443,7 +443,7 @@ def expand_kws(kws):
 
 def tokenize(text):
     text = (text or "").lower()
-    # 영문/숫자 ↔ 한글 경계에 공백 삽입 → 'databricks랑'·'mongodb는'·'pricingdb에서'
+    # 영문/숫자 ↔ 한글 경계에 공백 삽입 → 'youtube랑'·'instagram는'·'kakao에서'
     # 처럼 조사가 붙은 토큰을 영문 키워드와 한글로 분리 (검색 매칭율 개선)
     text = re.sub(r"([a-z0-9_])([가-힣])", r"\1 \2", text)
     text = re.sub(r"([가-힣])([a-z0-9_])", r"\1 \2", text)

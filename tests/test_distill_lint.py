@@ -345,7 +345,7 @@ class TestSourcePathExists(LintFixtureTestCase):
     def test_external_http_url_not_checked(self):
         p = os.path.join(self.wiki, "http-src.md")
         _write(p, _node_md(
-            sources='[{platform: confluence, url: "https://wiki.gmarket.com/x", date: "2026-06-12"}]'))
+            sources='[{platform: web, url: "https://example.com/x", date: "2026-06-12"}]'))
         self.assertEqual(self._lint(p), [])
 
     def test_repo_style_source_not_checked(self):

@@ -442,7 +442,7 @@ class TestMarkdownLinkExtraction(unittest.TestCase):
         self.assertEqual(brain._extract_links("[미확인](설계 의도 확인 필요)"), [])
 
     def test_raw_targeting_md_link_is_not_an_edge(self):
-        self.assertEqual(brain._extract_links("[x](../../raw/common/gmarket_common_infra.md)"), [])
+        self.assertEqual(brain._extract_links("[x](../../raw/chat/2021/2021-03.md)"), [])
 
     def test_image_embed_not_a_link(self):
         self.assertEqual(brain._extract_links("![diagram](pic.md)"), [])

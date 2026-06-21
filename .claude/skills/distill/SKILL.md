@@ -1,6 +1,6 @@
 ---
 name: distill
-description: raw 원본·외부 자료(코드 repo, Confluence, Jira, 회의록)를 wiki/ atomic 노드로 정제하는 절차. "정제", "distill", "wiki에 정리", "노드로 만들어", "raw를 위키로" 같은 요청이나, wiki 노드를 새로 만들거나 일괄 생성/갱신할 때 사용.
+description: raw 원본(카카오톡 대화·사진 캡처·구술 메모)을 wiki/ atomic 노드로 정제하는 절차. "정제", "distill", "wiki에 정리", "노드로 만들어", "raw를 위키로" 같은 요청이나, wiki 노드를 새로 만들거나 일괄 생성/갱신할 때 사용.
 ---
 
 # distill — raw → wiki 정제 절차
@@ -19,13 +19,13 @@ description: raw 원본·외부 자료(코드 repo, Confluence, Jira, 회의록)
 ### 2. 중복 검색
 - `search_brain`(MCP 도구) 또는 `app/brain.py`의 `search()`로 기존 노드를 먼저 찾는다.
 - **다각도로 검색한다 — 한 번의 질의로 끝내지 말 것:**
-  1. 한국어 키워드·영어 키워드로 **각각** 검색 (예: "할인 정책" 과 "discount policy")
-  2. 만들려는 노드의 **예상 slug를 직접** 검색 (예: `dc-policy-cache`)
-  3. `list_nodes`(MCP 도구)의 `tag` 필터로 같은 `domain/`·`repo/` 태그의 기존 노드 목록 확인
+  1. 한국어 키워드·영어 키워드로 **각각** 검색 (예: "음식 취향" 과 "food preference")
+  2. 만들려는 노드의 **예상 slug를 직접** 검색 (예: `partner-food-preference`)
+  3. `list_nodes`(MCP 도구)의 `tag` 필터로 같은 `domain/`·`topic/` 태그의 기존 노드 목록 확인
 - MCP를 못 쓰는 환경이면 repo 루트에서 폴백 실행 — 반환형은 `(wiki_hits, raw_hits)` 튜플
   (`wiki_hits = [(score, node)]`, `raw_hits = [(score, doc, text)]`):
   ```bash
-  python3 -c "import sys; sys.path.insert(0, 'app'); import brain; w, r = brain.search('할인 정책'); print([n['path'] for _, n in w]); print([d['path'] for _, d, _ in r])"
+  python3 -c "import sys; sys.path.insert(0, 'app'); import brain; w, r = brain.search('음식 취향'); print([n['path'] for _, n in w]); print([d['path'] for _, d, _ in r])"
   ```
 - 같은 주제 노드가 이미 있으면 **신규 생성 대신 기존 노드를 갱신**한다 (`updated` 갱신 포함).
 
