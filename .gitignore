@@ -1,0 +1,31 @@
+# ── 개인 대화 데이터 — 절대 커밋되면 안 됨 (이 repo는 템플릿) ──
+# 정규화된 카톡 월별 대화 (raw/chat/YYYY/*.md) + 통계
+raw/chat/[0-9][0-9][0-9][0-9]/
+raw/chat/manifest.md
+# 정제된 wiki 노드 (도메인 폴더 구조와 .gitkeep만 추적)
+wiki/**/*.md
+# 변경 이력(개인 적재 기록) — 헤더 템플릿만 추적하고 싶으면 이 줄을 지우세요
+# log.md
+# 카톡 원문 export
+*.txt
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log

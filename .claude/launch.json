@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "love-second-brain",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["app/server.py", "8080"],
+      "port": 8080
+    }
+  ]
+}

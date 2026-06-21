@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Love Second Brain — 지식 그래프 & RAG 대시보드</title>
+  <meta name="description" content="카카오톡 대화를 정제한 raw/wiki 마크다운 브레인의 로컬 지식 그래프 시각화 및 RAG Q&A 대시보드">
+  <link rel="stylesheet" href="/index.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo" aria-label="brain logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5a3 3 0 0 0-5.7-1.3A2.6 2.6 0 0 0 3.5 7 2.7 2.7 0 0 0 3 12a2.7 2.7 0 0 0 1 4.7A2.6 2.6 0 0 0 7 20a3 3 0 0 0 5-1V5Z"/>
+            <path d="M12 5a3 3 0 0 1 5.7-1.3A2.6 2.6 0 0 1 20.5 7 2.7 2.7 0 0 1 21 12a2.7 2.7 0 0 1-1 4.7A2.6 2.6 0 0 1 17 20a3 3 0 0 1-5-1V5Z"/>
+            <path d="M9 9.5h.5M15 9.5h-.5M9.5 13.5h1.2M13.3 13.5h1.2"/>
+          </svg>
+        </div>
+        <div>
+          <span class="brand-title">Love Second Brain</span>
+          <span class="brand-sub">나 ❤️ 너 · 우리의 기록</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-item active" id="nav-graph" onclick="switchTab('graph')">
+          <i data-lucide="network"></i><span>지식 그래프</span>
+        </div>
+        <div class="nav-item" id="nav-dashboard" onclick="switchTab('dashboard')">
+          <i data-lucide="layout-dashboard"></i><span>대시보드</span>
+        </div>
+        <div class="nav-item" id="nav-explorer" onclick="switchTab('explorer')">
+          <i data-lucide="folder-open"></i><span>노드 탐색기</span>
+        </div>
+        <div class="nav-item" id="nav-raw" onclick="switchTab('raw')">
+          <i data-lucide="file-text"></i><span>원본 소스 (raw)</span>
+        </div>
+        <div class="nav-item" id="nav-domains" onclick="switchTab('domains')">
+          <i data-lucide="map"></i><span>도메인 뷰</span>
+        </div>
+        <div class="nav-item" id="nav-timeline" onclick="switchTab('timeline')">
+          <i data-lucide="history"></i><span>최근 변경</span>
+        </div>
+        <div class="nav-item" id="nav-chatbot" onclick="switchTab('chatbot')">
+          <i data-lucide="sparkles"></i><span>AI 질의응답</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <p id="rag-status">RAG 엔진 확인 중…</p>
+        <p style="margin-top:4px; opacity:.6;">raw → distill → wiki → query</p>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+      <header class="header">
+        <h1 class="header-title" id="page-title">지식 그래프</h1>
+        <div class="header-meta">
+          <i data-lucide="git-branch"></i>
+          <span id="brain-badge">브레인 로딩 중…</span>
+        </div>
+      </header>
+
+      <!-- 1. DASHBOARD -->
+      <section class="tab-pane" id="tab-dashboard">
+        <h2 class="section-heading">💬 우리 카톡, 숫자로 보기</h2>
+        <div class="dashboard-grid" id="chat-cards">
+          <div class="card"><div class="card-value muted">…</div></div>
+        </div>
+
+        <div class="viz-row single">
+          <div class="viz-card">
+            <h2 class="viz-title">월별 메시지 수 (나 vs 상대)</h2>
+            <div class="chart-box tall"><canvas id="msg-monthly-chart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="viz-row">
+          <div class="viz-card">
+            <h2 class="viz-title">누가 더 많이 보냈을까?</h2>
+            <div class="chart-box"><canvas id="sender-chart"></canvas></div>
+          </div>
+          <div class="viz-card">
+            <h2 class="viz-title">연도별 메시지 수</h2>
+            <div class="chart-box"><canvas id="msg-year-chart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="viz-row">
+          <div class="viz-card">
+            <h2 class="viz-title">시간대별 활동 (0~23시)</h2>
+            <div class="chart-box"><canvas id="hour-chart"></canvas></div>
+          </div>
+          <div class="viz-card">
+            <h2 class="viz-title">요일별 활동</h2>
+            <div class="chart-box"><canvas id="weekday-chart"></canvas></div>
+          </div>
+        </div>
+
+        <h2 class="section-heading">🧠 브레인 (정제 지식)</h2>
+        <div class="dashboard-grid">
+          <div class="card">
+            <div class="card-title">원본 대화 (raw)</div>
+            <div class="card-value" id="stat-raw">0</div>
+            <div class="card-subtext">카톡 월별 원본 (불변)</div>
+          </div>
+          <div class="card">
+            <div class="card-title">정제 노드 (wiki)</div>
+            <div class="card-value" id="stat-wiki">0</div>
+            <div class="card-subtext">claim · concept · event …</div>
+          </div>
+          <div class="card">
+            <div class="card-title">연결 엣지</div>
+            <div class="card-value" id="stat-edges">0</div>
+            <div class="card-subtext">마크다운 링크로 이어진 노드 관계</div>
+          </div>
+          <div class="card">
+            <div class="card-title">도메인</div>
+            <div class="card-value" id="stat-domains">0</div>
+            <div class="card-subtext">인물 · 애정 · 추억 …</div>
+          </div>
+          <div class="card">
+            <div class="card-title">평균 연결도</div>
+            <div class="card-value" id="stat-degree">0</div>
+            <div class="card-subtext">노드당 평균 엣지 수</div>
+          </div>
+        </div>
+
+        <div class="viz-row">
+          <div class="viz-card">
+            <h2 class="viz-title">노드 타입 분포</h2>
+            <div class="chart-box"><canvas id="type-chart"></canvas></div>
+          </div>
+          <div class="viz-card">
+            <h2 class="viz-title">도메인별 문서 수 (raw / wiki)</h2>
+            <div class="chart-box"><canvas id="domain-chart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="viz-row">
+          <div class="viz-card">
+            <h2 class="viz-title">태그 클라우드</h2>
+            <div id="tag-cloud" class="tag-cloud"></div>
+          </div>
+          <div class="viz-card">
+            <h2 class="viz-title">최근 활동 (log.md)</h2>
+            <div id="log-timeline" class="log-timeline"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. KNOWLEDGE GRAPH -->
+      <section class="tab-pane active" id="tab-graph">
+        <div class="graph-layout">
+          <div class="graph-main">
+            <div class="graph-filter-bar" id="graph-filter-bar"></div>
+            <div id="graph-container">
+              <canvas id="graph-canvas"></canvas>
+            </div>
+            <div class="graph-legend" id="graph-legend"></div>
+            <p class="hint">💡 노드 클릭 → 우측 상세. 드래그로 이동, 스크롤로 줌.</p>
+          </div>
+          <div class="graph-sidebar">
+            <h3 class="panel-title">노드 상세</h3>
+            <div id="graph-node-details">
+              <p class="muted center">그래프에서 노드를 클릭하세요.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. NODE EXPLORER -->
+      <section class="tab-pane" id="tab-explorer">
+        <div class="explorer-header">
+          <input type="text" id="explorer-search" class="search-input"
+                 placeholder="노드·tldr·태그 검색…" oninput="filterNodes()">
+          <select id="explorer-type-filter" class="select-filter" onchange="filterNodes()">
+            <option value="">모든 타입</option>
+            <option value="claim">claim (주장)</option>
+            <option value="concept">concept (개념)</option>
+            <option value="decision">decision (결정)</option>
+            <option value="source">source (출처)</option>
+            <option value="person">person (인물)</option>
+            <option value="event">event (사건·추억)</option>
+          </select>
+        </div>
+        <div class="node-cards" id="node-cards"></div>
+      </section>
+
+      <!-- 4. RAW SOURCES (채팅 UI + grep) -->
+      <section class="tab-pane" id="tab-raw">
+        <div class="raw-layout">
+          <div class="raw-sidebar">
+            <input type="text" id="raw-search" class="search-input"
+                   placeholder="대화 파일 찾기 (예: 2022-06)…" oninput="filterRaw()">
+            <div id="raw-tree" class="raw-tree"></div>
+          </div>
+          <div class="raw-main">
+            <div class="grep-bar">
+              <input type="text" id="grep-input" class="search-input"
+                     placeholder="🔍 대화 전체에서 단어 찾기 (grep) — 예: 사랑해, 여행, 처음">
+              <span class="grep-hint">AI 아님 · 즉시 검색</span>
+            </div>
+            <div class="raw-reader center-empty" id="raw-reader">
+              <p class="muted">왼쪽에서 월별 대화를 고르거나, 위에서 단어를 검색하세요.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. DOMAIN VIEW -->
+      <section class="tab-pane" id="tab-domains">
+        <div class="domain-grid" id="domain-grid"></div>
+        <div class="domain-detail" id="domain-detail" style="display:none;">
+          <button class="domain-back-btn" id="domain-back-btn">← 도메인 목록</button>
+          <div id="domain-detail-content"></div>
+        </div>
+      </section>
+
+      <!-- 최근 변경 (타임라인) -->
+      <section class="tab-pane" id="tab-timeline">
+        <div class="timeline-toolbar">
+          <div class="filter-bar" id="timeline-filter"></div>
+          <span class="muted" id="timeline-meta"></span>
+        </div>
+        <p class="hint" style="text-align:left;margin-bottom:14px;">📜 log.md 타임라인 — 언제 무엇이 수집·정제·갱신됐는지. 유형 칩으로 필터.</p>
+        <div id="timeline-list" class="timeline-wrap"></div>
+      </section>
+
+      <!-- 6. AI 질의응답 (RAG 챗봇) -->
+      <section class="tab-pane" id="tab-chatbot">
+        <div class="chatbot-container">
+          <div class="chatbot-messages" id="chatbot-messages">
+            <div class="bot-msg">
+              <div class="bot-avatar">AI</div>
+              <div class="bot-text-bubble">
+                이 브레인(raw 카톡 + wiki 노드)에 대해 무엇이든 물어보세요.
+                관련 노드·대화 원본을 찾아 Claude CLI(구독 인증)로 근거 기반 답변을 만들어 드립니다.<br><br>
+                <strong>예시:</strong><br>
+                · 우리 처음 사귀기 시작한 날은?<br>
+                · 아내가 제일 좋아하는 음식이랑 싫어하는 거?<br>
+                · 둘만의 별명·은어 정리해줘<br>
+                · 우리가 같이 다녀온 여행지는?
+              </div>
+            </div>
+          </div>
+          <div class="chatbot-input-area">
+            <div class="chat-input-row">
+              <input type="text" id="chatbot-input" class="search-input"
+                     placeholder="우리 둘에 대해 물어보세요…">
+              <button class="chat-btn" id="chat-send-btn">전송</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
