@@ -196,24 +196,23 @@
         <div class="node-cards" id="node-cards"></div>
       </section>
 
-      <!-- 4. RAW SOURCES (채팅 UI + grep) -->
+      <!-- 4. RAW SOURCES (전체 연속 채팅 UI + grep + 캘린더 점프) -->
       <section class="tab-pane" id="tab-raw">
-        <div class="raw-layout">
-          <div class="raw-sidebar">
-            <input type="text" id="raw-search" class="search-input"
-                   placeholder="대화 파일 찾기 (예: 2022-06)…" oninput="filterRaw()">
-            <div id="raw-tree" class="raw-tree"></div>
-          </div>
+        <div class="raw-layout2">
           <div class="raw-main">
             <div class="grep-bar">
               <input type="text" id="grep-input" class="search-input"
                      placeholder="🔍 대화 전체에서 단어 찾기 (grep) — 예: 사랑해, 여행, 처음">
               <span class="grep-hint">AI 아님 · 즉시 검색</span>
             </div>
-            <div class="raw-reader center-empty" id="raw-reader">
-              <p class="muted">왼쪽에서 월별 대화를 고르거나, 위에서 단어를 검색하세요.</p>
+            <div class="raw-reader" id="raw-reader">
+              <div id="chat-scroll" class="chat-view"></div>
+              <div id="grep-panel" style="display:none;"></div>
             </div>
           </div>
+          <aside class="raw-calendar" id="raw-calendar">
+            <div class="cal-loading muted center">캘린더 로딩 중…</div>
+          </aside>
         </div>
       </section>
 

@@ -190,19 +190,49 @@ body {
 .link-item { cursor: pointer; border-left-color: var(--wife); }
 .link-item:hover { color: var(--text); }
 
-/* ---------- Raw (채팅 UI) ---------- */
-.raw-layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; height: calc(100vh - 130px); }
-.raw-sidebar { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 16px rgba(236,72,153,.06); }
-.raw-tree { display: flex; flex-direction: column; gap: 2px; }
-.raw-domain { font-size: .72rem; text-transform: uppercase; color: var(--accent); font-weight: 800; margin: 12px 0 3px; letter-spacing: .04em; }
-.raw-file { font-size: .82rem; color: var(--text-2); padding: 7px 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
-.raw-file:hover { background: var(--panel-2); color: var(--text); }
-.raw-file.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-.raw-file .raw-count { font-size: .7rem; opacity: .7; font-variant-numeric: tabular-nums; }
-
+/* ---------- Raw (전체 연속 채팅 UI + 캘린더) ---------- */
+.raw-layout2 { display: grid; grid-template-columns: 1fr 300px; gap: 18px; height: calc(100vh - 130px); }
 .raw-main { display: flex; flex-direction: column; gap: 0; min-width: 0;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; overflow: hidden;
   box-shadow: 0 4px 16px rgba(236,72,153,.06); }
+
+/* 캘린더 (오른쪽) */
+.raw-calendar { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px;
+  padding: 16px 16px 18px; box-shadow: 0 4px 16px rgba(236,72,153,.06); overflow-y: auto; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 4px; }
+.cal-title { font-size: .92rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.cal-nav { display: flex; gap: 4px; }
+.cal-btn { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--panel-border);
+  background: var(--panel-2); color: var(--accent); font-size: .8rem; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center; font-family: inherit; }
+.cal-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.cal-btn:disabled { opacity: .3; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dow { font-size: .66rem; font-weight: 700; color: var(--muted); text-align: center; padding: 3px 0; }
+.cal-dow.sun { color: #f43f5e; } .cal-dow.sat { color: var(--wife); }
+.cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative;
+  font-size: .76rem; border-radius: 8px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cal-day.empty { visibility: hidden; }
+.cal-day.inactive { color: var(--muted); opacity: .35; }
+.cal-day.active { cursor: pointer; font-weight: 700; color: var(--text); }
+.cal-day.active:hover { background: var(--accent-soft); color: var(--accent); }
+.cal-day.active::after { content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--accent); opacity: .5; }
+.cal-day.lvl2::after { opacity: .8; } .cal-day.lvl3::after { width: 6px; height: 6px; opacity: 1; }
+.cal-day.jumped { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.cal-day.jumped::after { background: #fff; }
+.cal-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--panel-border);
+  font-size: .72rem; color: var(--muted); line-height: 1.5; }
+.cal-jump-row { display: flex; gap: 6px; margin-top: 8px; }
+.cal-jump-row button { flex: 1; font-size: .72rem; padding: 6px 4px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--panel-border); background: var(--panel-2); color: var(--accent); font-family: inherit; font-weight: 600; }
+.cal-jump-row button:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+/* 월 섹션 (가상화) */
+.chat-month { display: flex; flex-direction: column; gap: 3px; }
+.chat-month-label { align-self: center; background: var(--accent); color: #fff; font-size: .74rem; font-weight: 800;
+  padding: 4px 16px; border-radius: 14px; margin: 18px 0 10px; position: sticky; top: 6px; z-index: 2; box-shadow: 0 2px 8px rgba(236,72,153,.25); }
+.chat-month.pending { justify-content: center; align-items: center; color: var(--muted); font-size: .8rem; }
 .grep-bar { display: flex; gap: 10px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--panel-border); background: var(--bg-soft); }
 .grep-bar .search-input { background: #fff; }
 .grep-hint { font-size: .74rem; color: var(--muted); white-space: nowrap; }
@@ -368,6 +398,6 @@ mark.hl { background: #ffe27a; color: inherit; padding: 0 2px; border-radius: 3p
 ::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 1100px) {
-  .viz-row, .dashboard-grid, .graph-layout, .raw-layout { grid-template-columns: 1fr; }
+  .viz-row, .dashboard-grid, .graph-layout, .raw-layout2 { grid-template-columns: 1fr; }
   .graph-sidebar { height: auto; }
 }

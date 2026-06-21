@@ -233,6 +233,36 @@ def chat_stats():
     return result
 
 
+_CHAT_CAL = None       # (signature, result) — 일자별 메시지 수 (캘린더용)
+
+
+def chat_calendar():
+    """날짜(YYYY-MM-DD)별 메시지 수 + 월 목록 — 캘린더 위젯/연속뷰 가상화용."""
+    global _CHAT_CAL
+    sig = _chat_signature()
+    if _CHAT_CAL is not None and _CHAT_CAL[0] == sig:
+        return _CHAT_CAL[1]
+    days = {}
+    for _full, entry, _doc in _chat_docs():
+        text = entry[2]
+        cur = None
+        for ln in text.split("\n"):
+            dm = _CHAT_DATE_RE.match(ln)
+            if dm:
+                cur = "%s-%s-%s" % (dm.group(1), dm.group(2), dm.group(3))
+                continue
+            if cur is not None and _CHAT_MSG_RE.match(ln):
+                days[cur] = days.get(cur, 0) + 1
+    months = sorted({d[:7] for d in days})
+    result = {
+        "days": days, "months": months,
+        "first": (min(days) if days else None),
+        "last": (max(days) if days else None),
+    }
+    _CHAT_CAL = (sig, result)
+    return result
+
+
 def grep_chat(query, limit=400):
     """카톡 원본을 줄 단위로 즉석 검색(grep) — 공백 구분 토큰 AND 매칭(대소문자 무시).
     각 매치: 파일 경로·파일 내 메시지 인덱스(idx)·날짜·시각·발신자·본문. idx는 프론트 버블 순서와 일치."""
@@ -323,6 +353,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/grep":
             q = (query.get("q", [""])[0] or "").strip()
             return self._json(grep_chat(q))
+        if path == "/api/chat_calendar":
+            return self._json(chat_calendar())
         if path == "/api/graph":
             return self._json(brain.build_graph(brain.load_wiki_nodes()))
         if path == "/api/nodes":

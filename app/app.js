@@ -767,182 +767,127 @@ function nodeDetailHTML(n, big = false) {
     <p class="muted" style="font-size:.74rem;font-family:ui-monospace,monospace;">${escapeHtml(n.path)}</p>`;
 }
 
-// ----------------------------- 4. RAW SOURCES (채팅 UI + grep) -----------------------------
-let rawOpenPath = null;
+// ----------------------------- 4. RAW SOURCES (전체 연속 채팅 + 캘린더 점프) -----------------------------
 let grepTokens = [];
+let rawBuilt = false;
+let calDays = {}, calMonths = [];        // /api/chat_calendar
+let calState = { y: 0, m: 0 };           // 캘린더에 표시 중인 연/월
+const monthText = {};                    // ym → 원문(text) 캐시
+const loadedMonths = new Set();          // 현재 DOM에 버블이 그려진 월
+let monthObserver = null;
+const MAX_LOADED = 6;                    // 동시에 그려두는 월 수 상한(가상화)
+const EST_ROW = 30, EST_DIV = 44;        // 높이 추정용(px)
 
 const CHAT_PATH_RE = /raw\/chat\/(\d{4})\/(\d{4})-(\d{2})\.md$/;
-const isChatPath = p => CHAT_PATH_RE.test(p);
-const MONTH_KO = ['', '1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-
-async function loadRaw() {
-  if (!rawList.length) {
-    try { rawList = await (await fetch('/api/raw')).json(); } catch { return; }
-  }
-  if (!chatStats) { try { chatStats = await (await fetch('/api/chat_stats')).json(); } catch {} }
-  renderRawTree(rawList);
-  bindGrep();
-}
-
-function monthCountMap() {
-  const map = {};
-  ((chatStats || {}).by_month || []).forEach(m => { map[m.month] = m.total; });
-  return map;
-}
-
-function renderRawTree(docs) {
-  const tree = document.getElementById('raw-tree');
-  tree.innerHTML = '';
-  const counts = monthCountMap();
-  const chat = docs.filter(d => isChatPath(d.path));
-  const other = docs.filter(d => !isChatPath(d.path));
-
-  // 채팅: 연도 그룹 → 월 (최신 연도부터)
-  const byYear = {};
-  chat.forEach(d => { const m = d.path.match(CHAT_PATH_RE); (byYear[m[1]] = byYear[m[1]] || []).push(d); });
-  Object.keys(byYear).sort((a, b) => b - a).forEach(year => {
-    const dh = document.createElement('div');
-    dh.className = 'raw-domain';
-    dh.textContent = `${year}년`;
-    tree.appendChild(dh);
-    byYear[year].sort((a, b) => a.path.localeCompare(b.path)).forEach(d => {
-      const m = d.path.match(CHAT_PATH_RE);
-      const ym = `${m[2]}-${m[3]}`;
-      const f = document.createElement('div');
-      f.className = 'raw-file';
-      f.dataset.path = d.path;
-      const cnt = counts[ym];
-      f.innerHTML = `<span>${MONTH_KO[parseInt(m[3], 10)]}</span>${cnt ? `<span class="raw-count">${fmt(cnt)}</span>` : ''}`;
-      f.title = d.path;
-      f.onclick = () => openRaw(d.path, f);
-      tree.appendChild(f);
-    });
-  });
-
-  // 그 외 raw 문서 (있으면)
-  if (other.length) {
-    const byDomain = {};
-    other.forEach(d => { (byDomain[d.domain] = byDomain[d.domain] || []).push(d); });
-    Object.keys(byDomain).sort().forEach(domain => {
-      const dh = document.createElement('div');
-      dh.className = 'raw-domain';
-      dh.textContent = domain;
-      tree.appendChild(dh);
-      byDomain[domain].forEach(d => {
-        const f = document.createElement('div');
-        f.className = 'raw-file';
-        f.dataset.path = d.path;
-        f.textContent = d.title || d.name;
-        f.title = d.path;
-        f.onclick = () => openRaw(d.path, f);
-        tree.appendChild(f);
-      });
-    });
-  }
-}
-
-function filterRaw() {
-  const q = document.getElementById('raw-search').value.toLowerCase();
-  renderRawTree(rawList.filter(d =>
-    d.path.toLowerCase().includes(q) || (d.title || '').toLowerCase().includes(q)));
-}
-
-// ── grep: 대화 전체 즉석 검색 (AI 아님) ──
-function bindGrep() {
-  const input = document.getElementById('grep-input');
-  if (!input || input.dataset.bound) return;
-  input.dataset.bound = '1';
-  let timer = null;
-  input.addEventListener('input', () => {
-    clearTimeout(timer);
-    const q = input.value.trim();
-    if (q.length < 2) {
-      grepTokens = [];
-      if (q.length === 0) restoreReader();
-      return;
-    }
-    timer = setTimeout(() => runGrep(q), 280);
-  });
-}
-
-function restoreReader() {
-  const reader = document.getElementById('raw-reader');
-  if (rawOpenPath) { openRaw(rawOpenPath); return; }
-  reader.classList.add('center-empty');
-  reader.innerHTML = '<p class="muted">왼쪽에서 월별 대화를 고르거나, 위에서 단어를 검색하세요.</p>';
-}
-
-async function runGrep(q) {
-  const reader = document.getElementById('raw-reader');
-  reader.classList.remove('center-empty');
-  reader.innerHTML = '<p class="muted center" style="margin-top:30px;">검색 중…</p>';
-  grepTokens = q.toLowerCase().split(/\s+/).filter(Boolean);
-  let data;
-  try { data = await (await fetch(`/api/grep?q=${encodeURIComponent(q)}`)).json(); }
-  catch { reader.innerHTML = '<p class="center" style="color:#e11d48;">검색 실패</p>'; return; }
-
-  if (!data.results.length) {
-    reader.innerHTML = `<div class="grep-stat">"<b>${escapeHtml(q)}</b>" — 일치하는 메시지가 없어요.</div>`;
-    return;
-  }
-  const head = `<div class="grep-stat">"<b>${escapeHtml(q)}</b>" — 총 <b>${fmt(data.total)}</b>번 등장${
-    data.truncated ? ` · 시간순 상위 <b>${data.results.length}</b>개` : ''}</div>`;
-  const items = data.results.map(r => `
-    <div class="grep-item" data-path="${escapeHtml(r.path)}" data-idx="${r.idx}">
-      <span class="grep-meta">${r.date} ${r.time}</span>
-      <span class="grep-sender ${r.sender === '나' ? 'me' : 'wife'}">${r.sender === '나' ? '나' : '상대'}</span>
-      <span class="grep-text">${highlightHtml(r.text, grepTokens)}</span>
-    </div>`).join('');
-  reader.innerHTML = head + `<div class="grep-results">${items}</div>`;
-  reader.querySelectorAll('.grep-item').forEach(it => {
-    it.onclick = () => openRaw(it.dataset.path, null, parseInt(it.dataset.idx, 10));
-  });
-}
-
-async function openRaw(path, el, jumpIdx) {
-  rawOpenPath = path;
-  document.querySelectorAll('.raw-file').forEach(f => f.classList.toggle('active', f.dataset.path === path));
-  const reader = document.getElementById('raw-reader');
-  reader.classList.remove('center-empty');
-  reader.innerHTML = '<p class="muted center" style="margin-top:30px;">로딩 중…</p>';
-  let data;
-  try { data = await (await fetch(`/api/raw?path=${encodeURIComponent(path)}`)).json(); }
-  catch { reader.innerHTML = '<p class="center" style="color:#e11d48;">로드 실패</p>'; return; }
-  if (data.error) { reader.innerHTML = '<p class="center" style="color:#e11d48;">파일을 찾을 수 없습니다.</p>'; return; }
-
-  if (isChatPath(path)) {
-    reader.innerHTML = renderChat(data.content);
-    if (jumpIdx != null) scrollToMessage(reader, jumpIdx);
-  } else {
-    reader.innerHTML = `<div class="raw-path">${escapeHtml(path)}</div>
-      <div class="node-body">${renderMarkdown(data.content)}</div>`;
-  }
-}
-
-function scrollToMessage(reader, idx) {
-  requestAnimationFrame(() => {
-    const row = reader.querySelector(`.chat-row[data-idx="${idx}"]`);
-    if (!row) return;
-    row.scrollIntoView({ block: 'center' });
-    const bubble = row.querySelector('.chat-bubble');
-    if (bubble) { bubble.classList.add('flash'); setTimeout(() => bubble.classList.remove('flash'), 1900); }
-  });
-}
-
 const CHAT_MSG_RE = /^(\d{1,2}:\d{2})\s+(나|아내):\s?(.*)$/;
 const CHAT_DATE_RE = /^##\s+(\d{4})-(\d{2})-(\d{2})\s*(?:\(([^)]*)\))?/;
+const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
+const ymOf = d => d.slice(0, 7);
+const monthPath = ym => `raw/chat/${ym.slice(0, 4)}/${ym}.md`;
 
-function renderChat(content) {
+async function loadRaw() {
+  bindGrep();
+  if (rawBuilt) return;
+  let cal;
+  try { cal = await (await fetch('/api/chat_calendar')).json(); }
+  catch { document.getElementById('chat-scroll').innerHTML = '<p class="muted center" style="margin-top:40px;">대화를 불러오지 못했어요.</p>'; return; }
+  calDays = cal.days || {};
+  calMonths = cal.months || [];
+  if (!calMonths.length) {
+    document.getElementById('chat-scroll').innerHTML = '<p class="muted center" style="margin-top:40px;">아직 적재된 카톡 대화가 없어요.</p>';
+    document.getElementById('raw-calendar').innerHTML = '<p class="muted center">대화 없음</p>';
+    rawBuilt = true; return;
+  }
+  buildContinuous();
+  const last = calMonths[calMonths.length - 1];
+  calState = { y: +last.slice(0, 4), m: +last.slice(5, 7) };
+  renderCalendar();
+  rawBuilt = true;
+}
+
+// ── 월 카운트 / 높이 추정 ──
+function monthMsgCount(ym) { let c = 0; for (const d in calDays) if (ymOf(d) === ym) c += calDays[d]; return c; }
+function monthActiveDays(ym) { let n = 0; for (const d in calDays) if (ymOf(d) === ym) n++; return n; }
+function estMonthHeight(ym) { return Math.max(80, monthMsgCount(ym) * EST_ROW + monthActiveDays(ym) * EST_DIV + 40); }
+
+// ── 연속 채팅 뼈대(월별 플레이스홀더) + 지연 로딩 옵저버 ──
+function buildContinuous() {
+  const scroll = document.getElementById('chat-scroll');
+  const reader = document.getElementById('raw-reader');
+  scroll.innerHTML = '';
+  calMonths.forEach(ym => {
+    const sec = document.createElement('div');
+    sec.className = 'chat-month pending';
+    sec.dataset.ym = ym;
+    sec.style.minHeight = estMonthHeight(ym) + 'px';
+    sec.textContent = `${+ym.slice(0, 4)}년 ${+ym.slice(5, 7)}월 …`;
+    scroll.appendChild(sec);
+  });
+  if (monthObserver) monthObserver.disconnect();
+  monthObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) loadMonth(e.target.dataset.ym); });
+  }, { root: reader, rootMargin: '900px 0px 900px 0px' });
+  scroll.querySelectorAll('.chat-month').forEach(s => monthObserver.observe(s));
+  showChat();
+  // 최신 월부터 보이게: 맨 아래로
+  loadMonth(calMonths[calMonths.length - 1]).then(() => { reader.scrollTop = reader.scrollHeight; });
+}
+
+async function ensureMonthText(ym) {
+  if (monthText[ym] != null) return monthText[ym];
+  try {
+    const data = await (await fetch(`/api/raw?path=${encodeURIComponent(monthPath(ym))}`)).json();
+    monthText[ym] = data.content || '';
+  } catch { monthText[ym] = ''; }
+  return monthText[ym];
+}
+
+async function loadMonth(ym) {
+  const sec = document.querySelector(`.chat-month[data-ym="${ym}"]`);
+  if (!sec || loadedMonths.has(ym)) return;
+  const text = await ensureMonthText(ym);
+  if (loadedMonths.has(ym)) return;       // 동시 호출 경쟁 방지
+  const reader = document.getElementById('raw-reader');
+  const wasAbove = sec.getBoundingClientRect().bottom <= reader.getBoundingClientRect().top + 1;
+  const before = sec.offsetHeight;
+  sec.classList.remove('pending');
+  sec.style.minHeight = '';
+  sec.innerHTML = renderChatInner(text, ym);
+  loadedMonths.add(ym);
+  const delta = sec.offsetHeight - before;
+  if (wasAbove && delta) reader.scrollTop += delta;   // 위쪽 로딩 시 스크롤 점프 방지
+  pruneMonths(ym);
+}
+
+function unloadMonth(ym) {
+  const sec = document.querySelector(`.chat-month[data-ym="${ym}"]`);
+  if (!sec || !loadedMonths.has(ym)) return;
+  sec.style.minHeight = sec.offsetHeight + 'px';      // 높이 유지 → 스크롤 점프 없음
+  sec.classList.add('pending');
+  sec.innerHTML = `${+ym.slice(0, 4)}년 ${+ym.slice(5, 7)}월 …`;
+  loadedMonths.delete(ym);
+}
+
+function pruneMonths(keepYm) {
+  if (loadedMonths.size <= MAX_LOADED) return;
+  const center = calMonths.indexOf(keepYm);
+  [...loadedMonths]
+    .sort((a, b) => Math.abs(calMonths.indexOf(b) - center) - Math.abs(calMonths.indexOf(a) - center))
+    .slice(0, loadedMonths.size - MAX_LOADED)
+    .forEach(ym => { if (ym !== keepYm) unloadMonth(ym); });
+}
+
+// ── 한 달치 → 버블 HTML (idx는 월 내부 순번 = grep idx와 일치) ──
+function renderChatInner(content, ym) {
   const lines = (content || '').split('\n');
-  let html = '<div class="chat-view">';
+  let html = `<div class="chat-month-label">${+ym.slice(0, 4)}년 ${+ym.slice(5, 7)}월</div>`;
   let idx = -1, lastSender = null;
   for (const ln of lines) {
     const dm = ln.match(CHAT_DATE_RE);
     if (dm) {
       const wd = dm[4] ? ` (${dm[4]})` : '';
-      html += `<div class="chat-date-divider">${+dm[1]}년 ${+dm[2]}월 ${+dm[3]}일${wd}</div>`;
-      lastSender = null;
-      continue;
+      html += `<div class="chat-date-divider" data-date="${dm[1]}-${dm[2]}-${dm[3]}">${+dm[1]}년 ${+dm[2]}월 ${+dm[3]}일${wd}</div>`;
+      lastSender = null; continue;
     }
     const mm = ln.match(CHAT_MSG_RE);
     if (!mm) continue;
@@ -951,12 +896,152 @@ function renderChat(content) {
     const me = sender === '나';
     const grouped = sender === lastSender;
     if (!me && !grouped) html += `<div class="chat-sender">상대</div>`;
-    const bubble = `<div class="chat-bubble">${highlightHtml(text, grepTokens)}</div>`;
-    const tEl = `<span class="chat-time">${time}</span>`;
-    html += `<div class="chat-row ${me ? 'me' : 'wife'}${grouped ? ' grouped' : ''}" data-idx="${idx}">${bubble}${tEl}</div>`;
+    html += `<div class="chat-row ${me ? 'me' : 'wife'}${grouped ? ' grouped' : ''}" data-idx="${idx}">` +
+            `<div class="chat-bubble">${highlightHtml(text, grepTokens)}</div><span class="chat-time">${time}</span></div>`;
     lastSender = sender;
   }
-  return html + '</div>';
+  return html;
+}
+
+// ── 점프 ──
+function flashEl(el) { if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1900); } }
+
+async function jumpToMonthIdx(ym, idx) {
+  showChat();
+  await loadMonth(ym);
+  requestAnimationFrame(() => {
+    const sec = document.querySelector(`.chat-month[data-ym="${ym}"]`);
+    const row = sec && sec.querySelector(idx != null ? `.chat-row[data-idx="${idx}"]` : '.chat-row');
+    if (row) { row.scrollIntoView({ block: 'center' }); flashEl(row.querySelector('.chat-bubble')); }
+    else if (sec) sec.scrollIntoView({ block: 'start' });
+  });
+}
+
+async function jumpToDate(dateStr) {
+  showChat();
+  const ym = ymOf(dateStr);
+  await loadMonth(ym);
+  requestAnimationFrame(() => {
+    const div = document.querySelector(`.chat-date-divider[data-date="${dateStr}"]`);
+    if (div) { div.scrollIntoView({ block: 'start' }); flashEl(div); }
+    else jumpToMonthIdx(ym);
+  });
+  document.querySelectorAll('.cal-day.jumped').forEach(d => d.classList.remove('jumped'));
+  const cell = document.querySelector(`.cal-day[data-date="${dateStr}"]`);
+  if (cell) cell.classList.add('jumped');
+}
+
+// citations / 노드 출처 링크에서 호출 (path = 월 파일, jumpIdx = 월 내부 순번)
+async function openRaw(path, _el, jumpIdx) {
+  const m = (path || '').match(CHAT_PATH_RE);
+  if (!m) return;
+  await loadRaw();
+  jumpToMonthIdx(`${m[2]}-${m[3]}`, jumpIdx == null ? null : jumpIdx);
+}
+
+// ── grep: 대화 전체 즉석 검색 (AI 아님) ──
+function showChat() { document.getElementById('chat-scroll').style.display = ''; document.getElementById('grep-panel').style.display = 'none'; }
+function showGrep() { document.getElementById('chat-scroll').style.display = 'none'; document.getElementById('grep-panel').style.display = ''; }
+
+function bindGrep() {
+  const input = document.getElementById('grep-input');
+  if (!input || input.dataset.bound) return;
+  input.dataset.bound = '1';
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { grepTokens = []; if (q.length === 0) showChat(); return; }
+    timer = setTimeout(() => runGrep(q), 280);
+  });
+}
+
+async function runGrep(q) {
+  const panel = document.getElementById('grep-panel');
+  showGrep();
+  panel.innerHTML = '<p class="muted center" style="margin-top:30px;">검색 중…</p>';
+  grepTokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+  let data;
+  try { data = await (await fetch(`/api/grep?q=${encodeURIComponent(q)}`)).json(); }
+  catch { panel.innerHTML = '<p class="center" style="color:#e11d48;">검색 실패</p>'; return; }
+  if (!data.results.length) {
+    panel.innerHTML = `<div class="grep-stat">"<b>${escapeHtml(q)}</b>" — 일치하는 메시지가 없어요.</div>`; return;
+  }
+  const head = `<div class="grep-stat">"<b>${escapeHtml(q)}</b>" — 총 <b>${fmt(data.total)}</b>번 등장${
+    data.truncated ? ` · 시간순 상위 <b>${data.results.length}</b>개` : ''} · 클릭하면 그 대화로 점프</div>`;
+  const items = data.results.map(r => {
+    const m = r.path.match(CHAT_PATH_RE); const ym = m ? `${m[2]}-${m[3]}` : '';
+    return `<div class="grep-item" data-ym="${ym}" data-idx="${r.idx}">
+      <span class="grep-meta">${r.date} ${r.time}</span>
+      <span class="grep-sender ${r.sender === '나' ? 'me' : 'wife'}">${r.sender === '나' ? '나' : '상대'}</span>
+      <span class="grep-text">${highlightHtml(r.text, grepTokens)}</span></div>`;
+  }).join('');
+  panel.innerHTML = head + `<div class="grep-results">${items}</div>`;
+  panel.querySelectorAll('.grep-item').forEach(it => {
+    it.onclick = () => jumpToMonthIdx(it.dataset.ym, parseInt(it.dataset.idx, 10));
+  });
+}
+
+// ── 캘린더 (오른쪽: 날짜 점프) ──
+function renderCalendar() {
+  const box = document.getElementById('raw-calendar');
+  const { y, m } = calState;
+  const ymStr = `${y}-${String(m).padStart(2, '0')}`;
+  const first = calMonths[0], last = calMonths[calMonths.length - 1];
+  const firstDow = new Date(y, m - 1, 1).getDay();
+  const ndays = new Date(y, m, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) cells += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= ndays; d++) {
+    const ds = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const c = calDays[ds] || 0;
+    if (c > 0) {
+      const lvl = c >= 120 ? 'lvl3' : c >= 30 ? 'lvl2' : '';
+      cells += `<div class="cal-day active ${lvl}" data-date="${ds}" title="${c.toLocaleString('ko-KR')}개 메시지">${d}</div>`;
+    } else cells += `<div class="cal-day inactive">${d}</div>`;
+  }
+  box.innerHTML =
+    `<div class="cal-head">
+       <div class="cal-nav">
+         <button class="cal-btn" data-go="py" ${y <= +first.slice(0, 4) ? 'disabled' : ''}>«</button>
+         <button class="cal-btn" data-go="pm" ${ymStr <= first ? 'disabled' : ''}>‹</button>
+       </div>
+       <div class="cal-title">${y}년 ${m}월</div>
+       <div class="cal-nav">
+         <button class="cal-btn" data-go="nm" ${ymStr >= last ? 'disabled' : ''}>›</button>
+         <button class="cal-btn" data-go="ny" ${y >= +last.slice(0, 4) ? 'disabled' : ''}>»</button>
+       </div>
+     </div>
+     <div class="cal-grid">${DOW_KO.map((d, i) => `<div class="cal-dow ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</div>`).join('')}${cells}</div>
+     <div class="cal-foot">점 = 그날 대화 있음(진할수록 많음). 날짜를 누르면 그 대화로 점프해요.
+       <div class="cal-jump-row">
+         <button class="cal-first">⏮ 맨 처음</button>
+         <button class="cal-last">가장 최근 ⏭</button>
+       </div>
+     </div>`;
+  box.querySelectorAll('.cal-day.active').forEach(c => c.onclick = () => jumpToDate(c.dataset.date));
+  box.querySelectorAll('.cal-btn[data-go]').forEach(b => b.onclick = () => calNav(b.dataset.go));
+  box.querySelector('.cal-first').onclick = () => jumpFirstLast(first, true);
+  box.querySelector('.cal-last').onclick = () => jumpFirstLast(last, false);
+}
+
+function calNav(go) {
+  let { y, m } = calState;
+  if (go === 'pm') { m--; if (m < 1) { m = 12; y--; } }
+  else if (go === 'nm') { m++; if (m > 12) { m = 1; y++; } }
+  else if (go === 'py') y--;
+  else if (go === 'ny') y++;
+  calState = { y, m };
+  renderCalendar();
+}
+
+function datesOfMonth(ym) { return Object.keys(calDays).filter(d => ymOf(d) === ym).sort(); }
+function jumpFirstLast(ym, isFirst) {
+  calState = { y: +ym.slice(0, 4), m: +ym.slice(5, 7) };
+  renderCalendar();
+  const ds = datesOfMonth(ym);
+  const target = isFirst ? ds[0] : ds[ds.length - 1];
+  if (target) jumpToDate(target);
 }
 
 function highlightHtml(text, tokens) {
