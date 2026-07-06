@@ -1,5 +1,9 @@
 # 💗 Love Second Brain
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/Python-3.8+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![GitHub stars](https://img.shields.io/github/stars/minwoo19930301/love-second-brain?style=social)](https://github.com/minwoo19930301/love-second-brain/stargazers)
+
 연인·부부의 **카카오톡 대화**를 **사람과 AI가 같이 읽고 채우는** 우리 둘만의 지식 베이스.
 `raw/`(불변 원본: 카톡 대화) → `wiki/`(정제된 atomic 노드, 마크다운 링크로 연결) → 핑크빛 대시보드 + AI 질의응답(RAG).
 
