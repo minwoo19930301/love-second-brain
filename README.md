@@ -1,5 +1,11 @@
 # 💗 Love Second Brain
 
+<!-- PROJECT-PRESENTATION:START -->
+<a href="https://github.com/minwoo19930301/love-second-brain"><img src=".github/project-cover.svg" alt="💗 Love Second Brain" width="960"></a>
+
+[![QUICK START](https://img.shields.io/badge/QUICK%20START-374151?style=for-the-badge)](#-시작하기--비어-있는-repo를-데이터로-채우기) [![SOURCE](https://img.shields.io/badge/SOURCE-444444?style=for-the-badge)](https://github.com/minwoo19930301/love-second-brain)
+<!-- PROJECT-PRESENTATION:END -->
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/Python-3.8+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![GitHub stars](https://img.shields.io/github/stars/minwoo19930301/love-second-brain?style=social)](https://github.com/minwoo19930301/love-second-brain/stargazers)
